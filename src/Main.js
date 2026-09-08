@@ -3,6 +3,7 @@ import { FileSystem } from './FileSystem'
 import { GoogleAuthentication } from './GoogleApiAuthentication'
 import { GoogleSheetService } from './GoogleSheetService'
 import { LanguageService } from './LanguageService'
+import { TranslateService } from './TranslateService'
 
 export async function exportAppModule(sheetId, sheetName, destinationFormat, languages) {
   await exportAppData(sheetId, sheetName, destinationFormat, languages, 'MODULE')
@@ -134,4 +135,52 @@ async function writeToSpreadsheet(sheetId, sheetName, sources) {
   }
   const response = await GoogleSheetService.writeSheet(gAuth, spreadsheet.spreadsheetId, properties, sources)
   console.log(response)
+}
+
+/**
+ * Read EN source module, auto-translate to target languages, and write all to spreadsheet.
+ * @param {string} sourceModule - Path to EN module (e.g. '../import/en')
+ * @param {string} sheetId - Google Spreadsheet ID
+ * @param {string} sheetName - Sheet tab name
+ * @param {string[]} targetLanguages - Array of language codes to translate to (e.g. ['VI', 'CN', 'JP'])
+ */
+export async function importAndTranslateModule(sourceModule, sheetId, sheetName, targetLanguages) {
+  console.log(`Importing and translating to sheet: ${sheetName}`)
+
+  // 1. Read EN source and flatten to key-value pairs
+  const enDict = LanguageService.processLanguageModule(sourceModule)
+  const keys = enDict.map(pair => pair[0])
+  const enValues = enDict.map(pair => pair[1])
+  console.log(`Found ${keys.length} keys`)
+
+  // 2. Build headers: [Key, EN, ...targetLanguages]
+  const headers = ['Key', 'EN', ...targetLanguages]
+
+  // 3. Initialize rows with Key and EN values
+  const rows = keys.map((key, i) => {
+    const row = new Array(headers.length).fill('')
+    row[0] = key
+    row[1] = enValues[i]
+    return row
+  })
+
+  // 4. Translate to each target language
+  for (let langIdx = 0; langIdx < targetLanguages.length; langIdx++) {
+    const lang = targetLanguages[langIdx]
+    const colIdx = langIdx + 2 // offset for Key and EN columns
+
+    console.log(`\nTranslating to ${lang}...`)
+    const translations = await TranslateService.translateBatch(enValues, lang)
+
+    for (let i = 0; i < translations.length; i++) {
+      rows[i][colIdx] = translations[i]
+    }
+    console.log(' ✓')
+  }
+
+  // 5. Write all data to spreadsheet
+  const sources = [headers, ...rows]
+  console.log(`\nWriting ${sources.length} rows x ${headers.length} columns to sheet...`)
+  await writeToSpreadsheet(sheetId, sheetName, sources)
+  console.log('Done! All translations written to sheet.')
 }
