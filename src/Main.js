@@ -1,3 +1,4 @@
+import path from 'path'
 import { CREDENTIAL_PATH } from './Config'
 import { FileSystem } from './FileSystem'
 import { GoogleAuthentication } from './GoogleApiAuthentication'
@@ -36,7 +37,7 @@ async function exportAppData(sheetId, sheetName, destinationFormat, languages, t
       FileSystem.writJsonToFile(mapping.destination, languageData[i].value)
     }
     if (type === 'MODULE') {
-      FileSystem.writeJsModuleToFile(mapping.destination, languageData[i].value)
+      FileSystem.writeJsModuleToFile(mapping.destination, languageData[i].value, language.toLowerCase())
     }
     console.log(`Written ${languageData[i].valueCount} values into ${mapping.destination}`)
   }
@@ -184,3 +185,54 @@ export async function importAndTranslateModule(sourceModule, sheetId, sheetName,
   await writeToSpreadsheet(sheetId, sheetName, sources)
   console.log('Done! All translations written to sheet.')
 }
+
+/**
+ * Read all data from sheet and export each language column to a JS file in outputDir (default './export'),
+ * following the format of import/en.js (const <lang> = { ... }; export default <lang>).
+ * @param {string} sheetId - Google Spreadsheet ID
+ * @param {string} sheetName - Sheet tab name (e.g. 'Sheet1')
+ * @param {string} [outputDir='./export'] - Destination directory
+ * @param {string[]} [languages] - Optional list of languages to export. If omitted, exports all languages found in sheet with values.
+ */
+export async function exportAllLanguagesFromSheet(sheetId, sheetName, outputDir = './export', languages = null) {
+  console.log(`Exporting data from sheet: ${sheetName}`)
+  const sheetData = await readFromSpreadsheet(sheetId, sheetName)
+  if (!sheetData || sheetData.length === 0) {
+    console.log('No data found in spreadsheet')
+    return
+  }
+
+  const languageData = LanguageService.processLanguageSheet(sheetData)
+  console.log(`Found ${languageData.length} language columns in sheet`)
+
+  let exportedCount = 0
+  for (let i = 0; i < languageData.length; i++) {
+    const lang = languageData[i].language
+    if (!lang) continue
+
+    // If explicit language list provided, check if lang is in it
+    if (languages && languages.length > 0) {
+      const isIncluded = languages.some(l => l.toUpperCase() === lang.toUpperCase())
+      if (!isIncluded) continue
+    }
+
+    // Skip columns that have no values
+    if (languageData[i].valueCount === 0) {
+      console.log(`Skipping ${lang} (0 values in sheet)`)
+      continue
+    }
+
+    const fileName = `${lang.toLowerCase()}.js`
+    const filePath = path.join(outputDir, fileName)
+    const varName = lang.toLowerCase().replace(/[^a-zA-Z0-9_$]/g, '_')
+
+    FileSystem.writeJsModuleToFile(filePath, languageData[i].value, varName)
+    console.log(`✓ Exported ${languageData[i].valueCount} keys to ${filePath} (var: ${varName})`)
+    exportedCount++
+  }
+
+  console.log(`\nDone! Exported ${exportedCount} language files to ${outputDir}`)
+}
+
+export const exportSheetToJs = exportAllLanguagesFromSheet
+

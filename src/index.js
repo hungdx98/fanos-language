@@ -1,21 +1,27 @@
 import { INSIGHT_SPREADSHEET_ID } from './Config'
-import { importAppModule, importAndTranslateModule } from './Main'
+import {
+  importAppModule,
+  importAndTranslateModule,
+  exportAllLanguagesFromSheet
+} from './Main'
 
-const TARGET_LANGUAGES = ['VI'
-  // ,'CN', 'JP', 'KO', 'RU', 'TH', 'TR', 'ES', 'FR', 'ID', 'PT'
-  ]
+const TARGET_LANGUAGES = [
+  'VI'
+  // , 'CN', 'JP', 'KO', 'RU', 'TH', 'TR', 'ES', 'FR', 'ID', 'PT'
+]
 
-// Import only EN to sheet
+// 1. Import only EN to sheet
 async function importEnToSheet() {
   await importAppModule(
     [
       '../import/en', 'EN'
     ],
-    INSIGHT_SPREADSHEET_ID, 'Sheet1'
+    INSIGHT_SPREADSHEET_ID,
+    'Sheet1'
   )
 }
 
-// Translate EN to all languages and write to sheet
+// 2. Translate EN to target languages and write to sheet
 async function translateEnToSheet() {
   await importAndTranslateModule(
     '../import/en',
@@ -25,8 +31,18 @@ async function translateEnToSheet() {
   )
 }
 
+// 3. Read all data from sheet and export each language to ./export/<lang>.js following import/en.js
+async function exportSheetToFiles() {
+  await exportAllLanguagesFromSheet(
+    INSIGHT_SPREADSHEET_ID,
+    'Sheet1',
+    './export'
+  )
+}
+
 async function main() {
-  await translateEnToSheet()
+  await exportSheetToFiles()
+  // await translateEnToSheet()
 }
 
 main()
