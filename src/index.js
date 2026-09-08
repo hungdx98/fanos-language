@@ -21,6 +21,17 @@ async function importEnToSheet() {
   )
 }
 
+// Import only VI to sheet
+async function importViToSheet() {
+  await importAppModule(
+    [
+      '../import/vi', 'VI'
+    ],
+    INSIGHT_SPREADSHEET_ID,
+    'Sheet1'
+  )
+}
+
 // 2. Translate EN to target languages and write to sheet
 async function translateEnToSheet() {
   await importAndTranslateModule(
@@ -41,6 +52,8 @@ async function exportSheetToFiles() {
 }
 
 async function main() {
+  // await importViToSheet()
+  // await importEnToSheet()
   await exportSheetToFiles()
   // await translateEnToSheet()
 }

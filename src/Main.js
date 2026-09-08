@@ -68,6 +68,56 @@ async function importAppData(sources, sheetId, sheetName, sourceType) {
     }
     jsonSources.push(jsonSource)
   }
+  // Check if spreadsheet already has existing data
+  const existingSheetData = await readFromSpreadsheet(sheetId, sheetName)
+  if (existingSheetData && existingSheetData.length > 0) {
+    const credentials = FileSystem.readJsonFromFile(CREDENTIAL_PATH)
+    if (!credentials) {
+      return console.log('Credential for Google Cloud API not supplied')
+    }
+    const gAuth = await GoogleAuthentication.authorize(credentials)
+    const spreadsheet = await GoogleSheetService.getSpreadsheet(gAuth, sheetId)
+
+    const headers = [...existingSheetData[0]]
+    const existingKeys = existingSheetData.slice(1).map(row => row[0])
+
+    for (let i = 0; i < jsonSources.length; i++) {
+      const jsonSource = jsonSources[i]
+      const dictMap = new Map(jsonSource.dict)
+
+      let colIndex = headers.findIndex(h => h && h.toUpperCase() === jsonSource.language.toUpperCase())
+      if (colIndex === -1) {
+        colIndex = headers.length
+        headers.push(jsonSource.language)
+      }
+
+      // Check for any new keys in imported module not present in sheet
+      const newKeyEntries = jsonSource.dict.filter(([k]) => !existingKeys.includes(k))
+      if (newKeyEntries.length > 0) {
+        const startRow = existingKeys.length + 2
+        const endRow = existingKeys.length + 1 + newKeyEntries.length
+        const keyRange = `${sheetName}!A${startRow}:A${endRow}`
+        const newKeyRows = newKeyEntries.map(([k]) => [k])
+        await GoogleSheetService.updateRange(gAuth, spreadsheet.spreadsheetId, keyRange, newKeyRows)
+        newKeyEntries.forEach(([k]) => existingKeys.push(k))
+      }
+
+      const colLetter = GoogleSheetService.numberToColumn(colIndex)
+      const colValues = [[jsonSource.language]]
+      for (let r = 0; r < existingKeys.length; r++) {
+        const key = existingKeys[r]
+        const val = dictMap.has(key) ? dictMap.get(key) : ''
+        colValues.push([val])
+      }
+
+      const range = `${sheetName}!${colLetter}1:${colLetter}${colValues.length}`
+      console.log(`Writing ${jsonSource.language} to range: ${range}`)
+      const response = await GoogleSheetService.updateRange(gAuth, spreadsheet.spreadsheetId, range, colValues)
+      console.log(response)
+    }
+    return
+  }
+
   const mergedSources = mergeLanguageSources(jsonSources)
   await writeToSpreadsheet(sheetId, sheetName, mergedSources)
 }

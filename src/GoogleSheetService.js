@@ -40,6 +40,23 @@ export class GoogleSheetService {
     })
     return response.data
   }
+
+  static async updateRange(gAuth, spreadsheetId, range, values) {
+    const gSheet = google.sheets({ version: 'v4', auth: gAuth });
+    const response = await gSheet.spreadsheets.values.update({
+      spreadsheetId,
+      range,
+      valueInputOption: 'RAW',
+      resource: {
+        values
+      }
+    })
+    return response.data
+  }
+
+  static numberToColumn(number) {
+    return numberToColumn(number)
+  }
 }
 
 function numberToColumn(number) {
