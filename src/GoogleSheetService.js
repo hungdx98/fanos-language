@@ -22,8 +22,8 @@ export class GoogleSheetService {
   }
 
   static buildRange(sheetTitle, rowCount, columnCount) {
-    const columnName = numberToColumn(columnCount + 1)
-    return `${sheetTitle}!B1:${columnName}${rowCount}`
+    const columnName = numberToColumn(columnCount)
+    return `${sheetTitle}!A1:${columnName}${rowCount}`
   }
 
   static async writeSheet(gAuth, spreadsheetId, sheetProperties, values) {
